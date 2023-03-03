@@ -1,6 +1,7 @@
 package hw1;
 
 import hw1.utils.CommonUtils;
+import hw1.utils.PrefixTable;
 import hw1.utils.sa.FastSuffixArray;
 import hw1.utils.FastaSequence;
 import hw1.utils.GeneIndex;
@@ -22,27 +23,26 @@ public class analysis {
 
         System.out.println("Genome reading time: " + (tac - tic) + " ms");
 
-
         String genome = fs.getSequencesAsString();
 
         System.out.println("Genome length: " + genome.length());
 
-//        tic = System.currentTimeMillis();
-////        var suffixArray = FastSuffixArray.create(fs.getSequence());
-//        tac = System.currentTimeMillis();
-//        System.out.println("Suffix Array creation time: " + (tac - tic) + " ms");
+        tic = System.currentTimeMillis();
+        var suffixArray = FastSuffixArray.create(genome.toCharArray());
+        tac = System.currentTimeMillis();
+        System.out.println("Suffix Array creation time: " + (tac - tic) + " ms");
 
-//        for (prefixLength = 20; prefixLength <= 40; prefixLength += 5) {
-//            tic = System.currentTimeMillis();
-//            var prefixTable = PrefixTable.create(genome, suffixArray, prefixLength);
-//            tac = System.currentTimeMillis();
-//            System.out.println("Prefix Table creation time for prefix length " + prefixLength + ": " + (tac - tic) + " ms");
-//
-//            String outputfile = "data/analysis/" + genomeName + "_" + prefixLength + ".sa";
-//
-//            buildsa.saveBinary(outputfile, genome, prefixLength, suffixArray, prefixTable);
-//
-//        }
+        for (prefixLength = 5; prefixLength <= 40; prefixLength += 5) {
+            tic = System.currentTimeMillis();
+            var prefixTable = PrefixTable.create(genome, suffixArray, prefixLength);
+            tac = System.currentTimeMillis();
+            System.out.println("Prefix Table creation time for prefix length " + prefixLength + ": " + (tac - tic) + " ms");
+
+            String outputfile = "data/analysis/" + genomeName + "_" + prefixLength + ".sa";
+
+            buildsa.saveBinary(outputfile, genome, prefixLength, suffixArray, prefixTable);
+
+        }
 
         prefixLength = 0;
         GeneIndex geneIndex = new GeneIndex(genome, prefixLength);

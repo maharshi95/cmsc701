@@ -27,64 +27,47 @@ def write_queries_in_fasta_format(queries, filename, chunk_size=500):
                 f.write(query[j:j + chunk_size])
                 f.write('\n')
 
+def get_random_cut(ref_text: str, length: int, mutation: bool = False):
+    start = np.random.randint(0, len(genome) - query_length)
+    query = list(ref_text[start:start + length])
+
+    if mutation:
+        k = int(0.8 * length)
+        for i in range(k, length):
+            if np.random.rand() < 0.3:
+                query[i] = np.random.choice(['A', 'C', 'G', 'T'])
+    return "".join(query)
+
+
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--genome', type=str, default='data/ecoli.fa', help='Genome file in fasta format')
-    parser.add_argument('--queries', type=str, default='data/ecoli_queries_weak.fa', help='Output file for queries in '
-                                                                                      'fasta format')
-    parser.add_argument('--num-queries', type=int, default=200000, help='Number of queries to generate')
-    args = parser.parse_args()
+    query_lengths = [10, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
 
-    sequences = parse_fasta_file(args.genome)
+    def get_reference(name: str):
+        return 'data/references/{}.fa'.format(name)
 
-    print('Found {} sequences'.format(len(sequences)))
+    def get_output_filename(reference: str, query_length: int):
+        return 'data/queries/{}_queries_{}.fa'.format(reference, query_length)
 
-    assert len(sequences) == 1
-    genome = sequences[0]
 
-    query_length_distribution = {
-        10: 1,
-        50: 1,
-        100: 1,
-        200: 2,
-        500: 2,
-        1000: 2,
-        2000: 1,
-    }
+    references = ['saureus', 'ecoli', 'fruitfly']
 
-    n_queries_by_length = {
-        length: int(num_queries * args.num_queries / sum(query_length_distribution.values()))
-        for (length, num_queries) in query_length_distribution.items()
-    }
-    n_queries_by_length[2000] += args.num_queries - sum(n_queries_by_length.values())
-
-    queries = []
-    for (query_length, num_queries) in tqdm(n_queries_by_length.items()):
-        for i in range(num_queries):
-
-            if i % 3 == 0:
-                # Generate 33 % of queries with a random start position
-                start = np.random.randint(0, len(genome) - query_length)
-                query = genome[start:start + query_length]
-                assert type(query) == str
-
-            elif i % 3 == 1:
-                # Generate 33% of queries as random sequences
-                query = ''.join(np.random.choice(['A', 'C', 'G', 'T'], size=query_length))
-                assert type(query) == str
-
+    for reference in tqdm(references, desc='Generating queries'):
+        genome = parse_fasta_file(get_reference(reference))[0]
+        for query_length in tqdm(query_lengths, desc='Generating queries for length', leave=False):
+            if query_length > len(genome):
+                continue
+            queries = []
+            if query_length < 500:
+                num_queries = 20000
+            elif query_length < 5000:
+                num_queries = 5000
+            elif query_length < 50000:
+                num_queries = 1000
             else:
-                # Generate 33% of queries mutated from the reference sequence
-                start = np.random.randint(0, len(genome) - query_length)
-                query = genome[start:start + query_length]
-                query = list(query)
-                for j in range(query_length):
-                    if np.random.rand() < 0.1:
-                        query[j] = np.random.choice(['A', 'C', 'G', 'T'])
-                query = ''.join(query)
-                assert type(query) == str
+                num_queries = 100
+            for i in range(num_queries):
+                query = get_random_cut(genome, query_length, mutation=i % 2 == 0)
+                queries.append(query)
+            write_queries_in_fasta_format(queries, get_output_filename(reference, query_length))
 
-            queries.append(query)
-
-    write_queries_in_fasta_format(queries, args.queries)

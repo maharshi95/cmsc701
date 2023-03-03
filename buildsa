@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+javac -d out/production/cmsc701 -cp src src/hw1/*.java
+java -cp out/production/cmsc701 hw1.buildsa "$@"
