@@ -1,9 +1,7 @@
 package hw1;
 
-import hw1.Query;
 import hw1.utils.*;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import hw1.utils.sa.SuffixArray;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -11,7 +9,7 @@ import java.util.*;
 
 public class QueryGenerator {
 
-    public static Query @Nullable [] makeStrongQueries(String genome, int topk) {
+    public static Query[] makeStrongQueries(String genome, int topk) {
 
         int[] suffixArray = SuffixArray.create(genome);
 
@@ -67,7 +65,7 @@ public class QueryGenerator {
         return queries.toArray(new Query[0]);
     }
 
-    static void writeQueriesToFile(String filename, Query @NotNull [] queries) {
+    static void writeQueriesToFile(String filename, Query[] queries) {
         try {
             FileWriter writer = new FileWriter(filename);
             for (Query query : queries) {

@@ -1,8 +1,5 @@
 package hw1.utils;
 
-
-import org.jetbrains.annotations.NotNull;
-
 import java.lang.*;
 import java.io.*;
 import java.util.*;
@@ -21,7 +18,7 @@ public final class FastaSequence {
     private FastaSequence() {
     }
 
-    public static @NotNull FastaSequence parseFromFile(String filename) {
+    public static FastaSequence parseFromFile(String filename) {
         FastaSequence fs = new FastaSequence();
         try(var fileInputStream = new FileInputStream(filename)) {
             fs.readSequenceFromInputStream(new BufferedInputStream(fileInputStream));
@@ -96,11 +93,19 @@ public final class FastaSequence {
         return header;
     }
 
+    public String getSequencesAsString() {
+        StringBuilder sb = new StringBuilder();
+        for (String s : sequence) {
+            sb.append(s);
+        }
+        return sb.toString();
+    }
+
     public int size() {
         return sequence.length;
     }
 
-    public static void main(String @NotNull [] args) throws Exception {
+    public static void main(String[] args) throws Exception {
         String fn = "";
         if (args.length > 0) fn = args[0];
         else {

@@ -1,4 +1,4 @@
-package hw1.utils;
+package hw1.utils.sa;
 
 // Java program for building suffix array of a given text
 // This code is taken from https://www.geeksforgeeks.org/suffix-array-set-2-a-nlognlogn-algorithm/

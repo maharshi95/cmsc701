@@ -1,7 +1,5 @@
 package hw1.utils;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +23,7 @@ public class DisplayUtils {
         }
     }
 
-    public static void displaySuffixArray(String text, int @NotNull [] suffixArray) {
+    public static void displaySuffixArray(String text, int[] suffixArray) {
         System.out.println(text);
         System.out.println("Suffix Array:");
         for(int i=0; i<suffixArray.length; i++)

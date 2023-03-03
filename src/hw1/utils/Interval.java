@@ -1,16 +1,21 @@
 package hw1.utils;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class Interval {
+/**
+ * A simple serializable class representing an interval of integers.
+ * The interval is [start, end)
+ */
+public class Interval implements Serializable {
 
     public int start; // inclusive
     public int end; // exclusive
 
     /**
      * Create an interval of integers from start (inclusive) to end (exclusive)
-     * @param start
-     * @param end
+     * @param start inclusive
+     * @param end exclusive
      */
     public Interval(int start, int end) {
         this.start = start;

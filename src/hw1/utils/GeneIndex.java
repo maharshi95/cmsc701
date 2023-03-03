@@ -1,34 +1,42 @@
 package hw1.utils;
 
-import org.jetbrains.annotations.NotNull;
-
+import hw1.utils.sa.FastSuffixArray;
+import hw1.utils.sa.SuffixArray;
+import java.io.*;
 import java.util.*;
 
-public class GeneIndex {
+import static hw1.utils.CommonUtils.binarySearch;
+
+public class GeneIndex implements Serializable {
 
     char[] genome;
 
     int[] suffixArray;
 
-    Map<String, Interval> prefixTable;
+    private Map<String, Interval> prefixTable;
 
     int prefixLength = 0;
 
     /**
      * Returns the number of contiguously matching prefix characters between the `query` and the suffix starting at
-     * `start`.
+     * `start`. The `currentLCP` parameter is used to skip over the characters that have already been matched.
      *
-     * @param start The start index of the suffix in the genome.
-     * @param query The query string.
+     * @param start      The start index of the suffix in the genome.
+     * @param query      The query string.
+     * @param currentLCP The current longest common prefix length.
      * @return Longest common prefix length.
      */
-    private int computeJointLCP(int start, String query, int currentLCP) {
+    private int computeLCP(int start, String query, int currentLCP) {
         var i = currentLCP;
         int limit = Math.min(genome.length - start, query.length());
         while (i < limit && query.charAt(i) == genome[start + i]) {
             i++;
         }
         return i;
+    }
+
+    private int computeLCP(int start, String query) {
+        return computeLCP(start, query, 0);
     }
 
     private int computeJointLCP(int start1, int start2, String query, int currentLCP) {
@@ -43,35 +51,6 @@ public class GeneIndex {
         return i;
     }
 
-    private int computeJointLCP(int start, String query) {
-        return computeJointLCP(start, query, 0);
-    }
-
-    private int computeQuerySuffixLCP(int suffixIndex, String query) {
-        var start = suffixArray[suffixIndex];
-        return computeJointLCP(start, query);
-    }
-
-    private int computeQuerySuffixLCP(int suffixIndex, String query, int offset) {
-        // Assumes that suffix and query already shares a prefix of length offset.
-
-        // Debug block:
-//        for (int i = 0; i < offset; i++) {
-//            if (query.charAt(i) != genome[suffixArray[suffixIndex] + i]) {
-//                var suffix_chunk = substring(suffixArray[suffixIndex], offset);
-//                var query_chunk = substring(0, offset);
-//                throw new IllegalArgumentException("The query and suffix do not share a prefix of length " + offset + ": " + suffix_chunk + " vs " + query_chunk);
-//            }
-//        }
-//        var i = offset;
-//        var start = suffixArray[suffixIndex];
-//        while (i < query.length() && start + i < genome.length && query.charAt(i) == genome[start + i]) {
-//            i++;
-//        }
-//        return i;
-        return computeJointLCP(suffixArray[suffixIndex], query, offset);
-    }
-
     public GeneIndex(char[] genome, int[] suffixArray, int prefixLength, Map<String, Interval> prefixTable) {
         this.genome = genome;
         this.suffixArray = suffixArray;
@@ -79,29 +58,10 @@ public class GeneIndex {
         this.prefixLength = prefixLength;
     }
 
-    public String substring(int start, int size) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = start; i < start + size && i < genome.length; i++) {
-            sb.append(genome[i]);
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Returns the suffix chunk of size `size` starting at the given suffix index.
-     * This is equivalent to calling {@link #substring(int, int)} with the suffix index and size.
-     * Used for debugging purposes only.
-     * @param suffixIndex The index of the suffix in the suffix array.
-     * @param size The size of the suffix chunk.
-     * @return The suffix chunk.
-     */
-    public String suffixChunk(int suffixIndex, int size) {
-        return substring(suffixArray[suffixIndex], size);
-    }
 
     public GeneIndex(String genome, int prefixLength) {
         this.genome = genome.toCharArray();
-        this.suffixArray = SuffixArray.create(genome);
+        this.suffixArray = FastSuffixArray.create(this.genome);
 
         if (prefixLength > genome.length())
             throw new IllegalArgumentException("Prefix length cannot be greater than genome length");
@@ -127,6 +87,10 @@ public class GeneIndex {
         return suffixArray;
     }
 
+    public Map<String, Interval> getPrefixTable() {
+        return prefixTable;
+    }
+
     /**
      * Compare the query with the gene prefix of the suffix at the given index. <br><br>
      * <b>Preconditions:</b> <br>
@@ -141,12 +105,18 @@ public class GeneIndex {
      * -1 if the suffix is lexicographically smaller than the query, and
      * 1 if the suffix is lexicographically greater than the query.
      */
-    private int compareSuffixWithQuery(int suffix, @NotNull String query, int p) {
-        while (p < query.length()) {
-            char ch = charAtSuffixPosition(suffix, p);
-            if (ch == 0) return -1;
-            if (ch != query.charAt(p)) return Character.compare(ch, query.charAt(p));
-            p++;
+    public int compareSuffixWithQuery(int suffix, String query, int p) {
+        if (suffix < 0 || suffix >= suffixArray.length)
+            throw new IllegalArgumentException("Invalid suffix index: " + suffix);
+        if (p < 0 || p > query.length())
+            throw new IllegalArgumentException("Invalid position p for comparing the suffix with Query: " + p);
+
+        int i = p;
+        while (i < query.length()) {
+            if (suffixArray[suffix] + i >= genome.length) return -1; // suffix is shorter than query (suffix < query
+            char ch = genome[suffixArray[suffix] + i];
+            if (ch != query.charAt(i)) return Character.compare(ch, query.charAt(i));
+            i++;
         }
         return 0;
     }
@@ -160,13 +130,12 @@ public class GeneIndex {
      * -1 if the suffix is lexicographically smaller than the query, and
      * 1 if the suffix is lexicographically greater than the query.
      */
-    private int compareSuffixWithQuery(int suffixIndex, @NotNull String query) {
-//        return substring(suffixArray[suffixIndex], query.length()).compareTo(query);
+    private int compareSuffixWithQuery(int suffixIndex, String query) {
         return compareSuffixWithQuery(suffixIndex, query, 0);
     }
 
 
-    private Interval findInitialRange(String query) {
+    public Interval findInitialRange(String query) {
         if (prefixTable == null || query.length() < prefixLength)
             return new Interval(0, suffixArray.length);
 
@@ -181,13 +150,12 @@ public class GeneIndex {
      */
     public int[] findAllOccurrencesNaive(String query) {
         Interval range = findInitialRange(query);
-
         if (range == null) return new int[0];
         int lo = range.start;
         int hi = range.end - 1;
 
-        int start = PrefixTable.binarySearch(lo, hi, i -> compareSuffixWithQuery(i, query) >= 0);
-        int end = PrefixTable.binarySearch(lo, hi, i -> compareSuffixWithQuery(i, query) > 0);
+        int start = binarySearch(lo, hi, i -> compareSuffixWithQuery(i, query) >= 0);
+        int end = binarySearch(lo, hi, i -> compareSuffixWithQuery(i, query) > 0);
 
         int[] result = new int[end - start];
         System.arraycopy(suffixArray, start, result, 0, end - start);
@@ -199,32 +167,23 @@ public class GeneIndex {
         return bound == 'L' ? cmp >= 0 : cmp > 0;
     }
 
-    private int statefulBinary(int lo, int hi, int lcp_lo, int lcp_hi, String query, char bound) {
-
-        int cmp;
+    private int statefulBinary(int lo, int hi, int lcp, String query, char bound) {
         boolean check;
-        int mid, lcp;
+        int mid;
 
-        cmp = compareSuffixWithQuery(hi, query, lcp_hi);
-        check = bound == 'L' ? cmp >= 0 : cmp > 0;
+        check = statefulBinarySearchPredicate(hi, query, lcp, bound);
         if (!check)
             return hi + 1;
-
-        lcp = Math.min(lcp_lo, lcp_hi);
 
         while (lo < hi) {
             lcp = computeJointLCP(suffixArray[lo], suffixArray[hi], query, lcp);
             if (lcp == -1) // lcp(lo, hi) < lcp(lo, p)
                 return bound == 'L' ? -1 : lo; // return -1 if bound is 'L' and lo if bound is 'R'
-
             mid = (lo + hi) >>> 1;
-
-            cmp = compareSuffixWithQuery(mid, query, lcp);
-            check = bound == 'L' ? cmp >= 0 : cmp > 0;
-
+            check = statefulBinarySearchPredicate(mid, query, lcp, bound);
             if (check)
                 hi = mid;
-             else
+            else
                 lo = mid + 1;
         }
         return lo;
@@ -244,13 +203,15 @@ public class GeneIndex {
         int lo = range.start;
         int hi = range.end - 1;
 
-        int lcp_lo = computeQuerySuffixLCP(lo, query);
-        int lcp_hi = computeQuerySuffixLCP(hi, query);
+//        int lcp = Math.min(computeLCP(suffixArray[lo], query), computeLCP(suffixArray[hi], query));
+        int lcp = computeJointLCP(suffixArray[lo], suffixArray[hi], query, 0);
+        if (lcp == -1) // lcp(lo, hi) < lcp(lo, p)
+            return new int[0];
 
-        int start = statefulBinary(lo, hi, lcp_lo, lcp_hi, query, 'L');
+        int start = statefulBinary(lo, hi, lcp, query, 'L');
         if (start == -1)
             return new int[0];
-        int end = statefulBinary(lo, hi, lcp_lo, lcp_hi, query, 'U');
+        int end = statefulBinary(lo, hi, lcp, query, 'U');
 
         int[] result = new int[end - start];
         System.arraycopy(suffixArray, start, result, 0, end - start);
@@ -263,61 +224,59 @@ public class GeneIndex {
         return genome[genomeIndex];
     }
 
+
     /**
-     * Compare the pth character of the suffix at the given index with the given character ch.
+     * Deserialize a GeneIndex from a file and return it.
+     * Refer to {@link} for the serialization format.
      *
-     * @param ch          the character to compare with
-     * @param suffixIndex the index of the suffix in the suffix array
-     * @param p           the position of the character in the suffix
-     * @return 0 if the pth character of the suffix at the given index is equal to ch, -1 if it is less than ch, 1 if it is greater than ch
+     * @param filename the name of the file to deserialize from
+     * @return the deserialized GeneIndex
      */
-    int compareCharAtPosition(int suffixIndex, int p, char ch) {
-        return Character.compare(charAtSuffixPosition(suffixIndex, p), ch);
+    public static GeneIndex deserializeFromFile(String filename) {
+        File file = new File(filename);
+        try {
+            FileInputStream fis = new FileInputStream(file);
+            ObjectInputStream ois = new ObjectInputStream(fis);
+            var genome = (String) ois.readObject();
+            var suffixArray = (int[]) ois.readObject();
+            var prefixLength = (int) ois.readObject();
+
+            @SuppressWarnings("unchecked")
+            var prefixTable = (Map<Integer, Interval>) ois.readObject();
+
+            Map<String, Interval> prefixStringTable = new HashMap<>();
+            for (var entry : prefixTable.entrySet()) {
+                int prefixIndex = entry.getKey();
+                int start = entry.getValue().start;
+                int end = entry.getValue().end;
+                var prefix = genome.substring(prefixIndex, prefixIndex + prefixLength);
+                prefixStringTable.put(prefix, new Interval(start, end));
+            }
+            return new GeneIndex(genome.toCharArray(), suffixArray, prefixLength, prefixStringTable);
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public int[] findAllOccurrencesSpeedy(String query) {
-        Interval range = findInitialRange(query);
-        if (range == null) return new int[0];
-
-        int lo = range.start;
-        int hi = range.end;
-
-        int p = query.length() >= prefixLength ? prefixLength : 0;
-        while (p < query.length() && lo < hi) {
-            char ch = query.charAt(p);
-            if (charAtSuffixPosition(lo, p) == charAtSuffixPosition(hi - 1, p)) {
-                if (ch != charAtSuffixPosition(lo, p))
-                    return new int[0];
-                p++;
-                continue;
-            }
-
-            int pFinal = p;
-            lo = PrefixTable.binarySearch(lo, hi - 1, i -> compareCharAtPosition(i, pFinal, ch) >= 0);
-            if (lo == hi)
-                return new int[0];
-            hi = PrefixTable.binarySearch(lo, hi - 1, i -> compareCharAtPosition(i, pFinal, ch) > 0);
-            p++;
+    private String substring(int start, int size) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = start; i < start + size && i < genome.length; i++) {
+            sb.append(genome[i]);
         }
-
-        int size = hi - lo;
-        int[] result = new int[size];
-        System.arraycopy(suffixArray, lo, result, 0, size);
-        return result;
-
+        return sb.toString();
     }
 
-    public static int[] findAllOccurrencesGold(@NotNull String text, String query) {
-        List<Integer> result = new ArrayList<>();
-        int i = 0;
-        while (i < text.length() && i != -1) {
-            i = text.indexOf(query, i);
-            if (i != -1) {
-                result.add(i);
-                i++;
-            }
-        }
-        return result.stream().mapToInt(Integer::intValue).toArray();
+    /**
+     * Returns the suffix chunk of size `size` starting at the given suffix index.
+     * This is equivalent to calling {@link #substring(int, int)} with the suffix index and size.
+     * Used for debugging purposes only.
+     *
+     * @param suffixIndex The index of the suffix in the suffix array.
+     * @param size        The size of the suffix chunk.
+     * @return The suffix chunk.
+     */
+    private String suffixChunk(int suffixIndex, int size) {
+        return substring(suffixArray[suffixIndex], size);
     }
 
     void display() {
@@ -340,8 +299,6 @@ public class GeneIndex {
             System.out.printf("%2d ", j);
         }
         System.out.println();
-
-
     }
 
     public static void main(String[] args) {
@@ -359,14 +316,14 @@ public class GeneIndex {
 
         var geneIndex = new GeneIndex(genome, 2);
 
-        System.out.println("LCP of abrac and abrak " + geneIndex.computeJointLCP(0, "abrac"));
+        System.out.println("LCP of abrac and abrak " + geneIndex.computeLCP(0, "abrac"));
 
 //        queries = new String[]{"ca"};
         geneIndex.display();
         for (int i = 0; i < queries.length; i++) {
             String query = queries[i];
 //            System.out.println("Query: " + query);
-            int[] goldResult = findAllOccurrencesGold(genome, query);
+            int[] goldResult = CommonUtils.findAllOccurrencesGold(genome, query);
 
             int[] naiveResult = geneIndex.findAllOccurrencesNaive(query);
             Arrays.sort(naiveResult);

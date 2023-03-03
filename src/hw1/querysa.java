@@ -3,7 +3,6 @@ package hw1;
 import hw1.utils.FastaSequence;
 import hw1.utils.GeneIndex;
 import hw1.utils.Interval;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -11,30 +10,8 @@ import java.io.FileReader;
 import java.util.*;
 
 public class querysa {
-    public static GeneIndex loadFromFile(String filename) throws FileNotFoundException {
-        Scanner in = new Scanner(new FileReader(filename));
-        int genomeLength = in.nextInt();
-        String genome = in.next();
-        int[] suffixArray = new int[genomeLength];
 
-        for (int i = 0; i < genomeLength; i++) {
-            suffixArray[i] = in.nextInt();
-        }
-        int prefixLength = in.nextInt();
-        int prefixTableSize = in.nextInt();
-
-        Map<String, Interval> prefixTable = new HashMap<>();
-        for (int i = 0; i < prefixTableSize; i++) {
-            int prefixIndex = in.nextInt();
-            int start = in.nextInt();
-            int end = in.nextInt();
-            var prefix = genome.substring(prefixIndex, prefixIndex + prefixLength);
-            prefixTable.put(prefix, new Interval(start, end));
-        }
-        return new GeneIndex(genome.toCharArray(), suffixArray, prefixLength, prefixTable);
-    }
-
-    static Query @NotNull [] readQueries(String filename, int minSize) {
+    static Query[] readQueries(String filename, int minSize) {
         var fasta = FastaSequence.parseFromFile(filename);
         var queries = new ArrayList<Query>();
         for (int i = 0; i < fasta.size(); i++) {
@@ -52,7 +29,7 @@ public class querysa {
         return queries.toArray(new Query[0]);
     }
 
-    public static Query @NotNull [] readQueries(String filename) {
+    public static Query[] readQueries(String filename) {
         return readQueries(filename, 0);
     }
 
@@ -88,7 +65,7 @@ public class querysa {
         }
     }
 
-    public static void main(String[] args) throws FileNotFoundException {
+    public static void main(String[] args) {
 
         assert args.length != 4 : "Usage: querysa <binary index file> <query file> <query mode> <output>";
 
@@ -101,9 +78,7 @@ public class querysa {
         if (!queryMode.equals("naive") && !queryMode.equals("simpaccel"))
             throw new IllegalArgumentException("Query mode must be either 'naive' or 'simpaccel'");
 
-//        binaryFilename = "data/ecoli.sa";
-
-        GeneIndex geneIndex = loadFromFile(binaryFilename);
+        GeneIndex geneIndex = GeneIndex.deserializeFromFile(binaryFilename);
 
         System.out.println("Built GeneIndex from " + binaryFilename);
 
@@ -112,29 +87,16 @@ public class querysa {
         System.out.println("Read " + queries.length + " queries");
 
         long tic, tac;
-        List<int[]> naiveHits;
-        List<int[]> speedyHits;
+        List<int[]> hits;
 
         tic = System.currentTimeMillis();
-        speedyHits = processQueries(queries, geneIndex, "simpaccel");
+        hits = processQueries(queries, geneIndex, queryMode);
         tac = System.currentTimeMillis();
-        System.out.println("Speedy: " + (tac - tic) + " ms");
+        double timeTaken = (tac - tic);
+        double nk = queries.length / 1000.0;
 
-        tic = System.currentTimeMillis();
-        naiveHits = processQueries(queries, geneIndex, "naive");
-        tac = System.currentTimeMillis();
-        System.out.println("Naive: " + (tac - tic) + " ms");
+        System.out.printf("Time taken per 1k queries: %.2f ms%n", timeTaken / nk);
 
-        for (int i = 0; i < queries.length; i++) {
-            Arrays.sort(naiveHits.get(i));
-            Arrays.sort(speedyHits.get(i));
-            if (!Arrays.equals(naiveHits.get(i), speedyHits.get(i))) {
-                System.out.println("Error: " + queries[i].header);
-                System.out.println("Naive: " + Arrays.toString(naiveHits.get(i)));
-                System.out.println("Speedy: " + Arrays.toString(speedyHits.get(i)));
-            }
-        }
-
-        writeQueryResults(outputFilename, queries, naiveHits);
+        writeQueryResults(outputFilename, queries, hits);
     }
 }

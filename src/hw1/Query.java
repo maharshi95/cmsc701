@@ -1,5 +1,7 @@
 package hw1;
 
+import java.util.Arrays;
+
 public class Query {
     String header;
     String sequence;
@@ -11,6 +13,10 @@ public class Query {
         String[] headerParts;
         try {
             headerParts = header.split(" ", 2);
+            if (headerParts.length == 1) {
+                headerParts = new String[]{"", ""};
+                headerParts[0] = header;
+            }
         } catch (Exception e) {
             headerParts = new String[]{"", ""};
             headerParts[0] = header;

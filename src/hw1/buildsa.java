@@ -1,41 +1,23 @@
 package hw1;
 
 import hw1.utils.*;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import hw1.utils.sa.FastSuffixArray;
 
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.io.*;
 import java.util.Map;
 
 public class buildsa {
 
-    static void saveOutputs(String filename, @NotNull String genome, int prefixLength, int @NotNull [] suffixArray,
-                            Map<Integer, Interval> prefixTable) {
-        try (FileWriter writer = new FileWriter(filename)) {
-            writer.write("" + genome.length());
-            writer.write("\n");
-
-            writer.write(genome);
-            writer.write("\n");
-
-            for (int idx : suffixArray) {
-                writer.write("" + idx);
-                writer.write(" ");
-            }
-            writer.write("\n");
-
-            writer.write("" + prefixLength + " " + prefixTable.size() + "\n");
-            for (Map.Entry<Integer, Interval> entry : prefixTable.entrySet()) {
-                var idx = entry.getKey();
-                var interval = entry.getValue();
-                writer.write(idx + " " + interval.start + " " + interval.end + "\n");
-            }
+    public static void saveBinary(String filename, String genome, int prefixLength, int[] suffixArray, Map<Integer,
+            Interval> prefixTable) {
+        File file = new File(filename);
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
+            oos.writeObject(genome);
+            oos.writeObject(suffixArray);
+            oos.writeObject(prefixLength);
+            oos.writeObject(prefixTable);
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
@@ -51,14 +33,14 @@ public class buildsa {
             reference = args[0];
             outputFilename = args[1];
         } else if (args.length == 4) {
-            assert args[0].equals("--preftab"): "Invalid argument: " + args[0];
+            assert args[0].equals("--preftab") : "Invalid argument: " + args[0];
             try {
                 prefixLength = Integer.parseInt(args[1]);
             } catch (NumberFormatException e) {
                 System.err.println("Invalid prefix length: " + args[1] + ". Must be an integer.");
                 System.exit(1);
             }
-            assert prefixLength >= 1: "Invalid prefix length: " + args[1] + ". Must be >= 1.";
+            assert prefixLength >= 1 : "Invalid prefix length: " + args[1] + ". Must be >= 1.";
             reference = args[2];
             outputFilename = args[3];
         } else {
@@ -66,13 +48,33 @@ public class buildsa {
             System.exit(1);
         }
 
-        String genome = FastaSequence.parseFromFile(reference).getSequence();
+        long tic, tac;
 
-        int[] suffixArray = SuffixArray.create(genome);
+        System.out.printf("Reference: %s\n", reference);
+        double fileLength = new File(reference).length() / Math.pow(2, 20);
+        System.out.printf("File size: %.2f MB\n", fileLength);
 
+        tic = System.currentTimeMillis();
+        String genome = FastaSequence.parseFromFile(reference).getSequencesAsString();
+        genome = genome.toUpperCase();
+        tac = System.currentTimeMillis();
+
+        System.out.println("Genome length: " + genome.length());
+        System.out.println("Time to read genome: " + (tac - tic) + " ms");
+
+        tic = System.currentTimeMillis();
+        int[] suffixArray = FastSuffixArray.create(genome.toCharArray());
+        tac = System.currentTimeMillis();
+        System.out.println("Time to create suffix array: " + (tac - tic) + " ms");
+
+        tic = System.currentTimeMillis();
         var prefixTable = PrefixTable.create(genome, suffixArray, prefixLength);
+        tac = System.currentTimeMillis();
+        System.out.println("Time to create prefix table: " + (tac - tic) + " ms");
 
-        saveOutputs(outputFilename, genome, prefixLength, suffixArray, prefixTable);
+        saveBinary(outputFilename, genome, prefixLength, suffixArray, prefixTable);
 
+        File file = new File(outputFilename);
+        System.out.printf("Binary file size: %.2f MB\n", file.length() / Math.pow(2, 20));
     }
 }
