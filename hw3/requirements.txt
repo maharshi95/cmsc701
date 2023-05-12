@@ -2,3 +2,7 @@ numpy
 scipy
 pandas
 bloom-filter2
+Cython
+bbhash
+tqdm
+bitarray
